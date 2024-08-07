@@ -263,18 +263,39 @@ def needleman_wunsch(seq1, seq2, match_score=1, gap_cost=1):
     return aligned_seq1, aligned_seq2, mid, score_matrix
 
 
+def seq_text(seq: str):
+    s = mn.Text(seq, font_size=24, font="monospace", t2c={".": mn.BLACK})
+
+    return s
+
+
 def seq_group(seq: str):
     g = []
     for char in seq:
         s = mn.Square(
-            side_length=0.25,
+            side_length=0.35,
             stroke_width=0.0,
+            z_index=0,
         )
 
-        if char != ".":
-            t = mn.Text(char, font_size=24, font="monospace")
-        else:
-            t = mn.Text(char, font_size=24, font="monospace", color=mn.BLACK)
+        t = mn.Text(
+            char,
+            font_size=24,
+            font="monospace",
+            z_index=1
+        )
+
+        if char == ".":
+            t.set_color(mn.BLACK)
+
+        t.move_to(s.get_center())
+
+        if char == "Q":
+            t.shift(mn.DOWN * 0.01)
+        elif char == "L":
+            t.shift(mn.RIGHT * 0.01)
+        # elif char == "G":
+        #     t.shift(mn.RIGHT * 0.01)
 
         g.append(mn.VGroup(s, t))
 
@@ -376,6 +397,257 @@ class AlignmentDp(mn.Scene):
         self.play(mn.FadeIn(boxes))
 
 
-class Msa(mn.Scene):
+msa_colors = {
+    "A": "#b7bc97",
+    "C": "#ff5701",
+    "D": "#019fb6",
+    "E": "#01a47f",
+    "F": "#d3aec4",
+    "G": "#36c6fe",
+    "H": "#2194f5",
+    "I": "#faa311",
+    "K": "#34d098",
+    "L": "#f3aa58",
+    "M": "#e1af84",
+    "N": "#05cbe5",
+    "P": "#80cd02",
+    "Q": "#5a9e7e",
+    "R": "#03cfb7",
+    "S": "#a9beaf",
+    "T": "#969357",
+    "V": "#bf8609",
+    "W": "#ff42c8",
+    "Y": "#a687a1",
+}
+
+msa_colors = {k: mn.ManimColor.from_hex(msa_colors[k]) for k in msa_colors}
+msa_colors["-"] = mn.BLACK
+
+
+def protein_seqs():
+    seqs = [
+        "SNDSLCTKCKNNLLVNTDQSYCVCKECECSQEG",
+        "MEQYLCLCRHMGLFNAKDSGEGCIDCGSSFPF",
+        "ANLRKCKVCNKGKIFNREKMYRRCMFCESVAQY",
+        "LDEKICHGCNREILGNWTNQSYRVCQFCGAVFPL",
+        "ALNHCICNERASTIVLQQKIDDGQCQDCQSINPK",
+        "NDDRHCSGCGGDGLYMTADFYEVCLDCGATFPY",
+        "GNASACIVRCHHEEVLNEDRGYLACIECEYSEPT",
+        "LALSKCGNCSYDWIIILRDDDREVCSNCGAIFSY",
+        "DYWICRDGNHPGLLAEDGSMFCRFCGISHQV",
+        "SQDSTCQKCRSNLVMHTTGSYEVCEFCEISQPV",
+    ]
+    group = mn.VGroup(*[seq_group(seq) for seq in seqs]).arrange(mn.DOWN)
+
+    return group
+
+
+def protein_ali():
+    seqs = [
+        "-SNDSLC-TKCKNNLL-VNTDQSYCVCKECECSQEG",
+        "-MEQYLC-L-CRHMGL-FNAKDSGEGCIDCGSSFPF",
+        "-ANLRKC-KVCNKGKI-FNREKMYRRCMFCESVAQY",
+        "-LDEKIC-HGCNREILGNWTNQSYRVCQFCGAVFPL",
+        "ALNHCICNERASTIVLQQKIDDGQ--CQDCQSINPK",
+        "-NDDRHC-SGCGGDGL-YMTADFYEVCLDCGATFPY",
+        "-GNASACIVRCHHEEV-LNEDRGYLACIECEYSEPT",
+        "-LALSKC-GNCSYDWIIILRDDDREVCSNCGAIFSY",
+        "--DYWIC-RDGNHPGL--LAEDGSMFCRFCGISHQV",
+        "-SQDSTC-QKCRSNLV-MHTTGSYEVCEFCEISQPV",
+    ]
+    group = mn.VGroup(*[seq_group(seq) for seq in seqs]).arrange(mn.DOWN)
+
+    ali_2d = [list(seq) for seq in seqs]
+
+    return group, ali_2d
+
+
+protein_alphabet = ["A", "C", "D", "E", "F", "G", "H", "I",
+                    "K", "L", "M", "N", "P", "Q", "R", "S", "T", "V", "W", "Y"]
+
+
+def residue_axes():
+    axes = mn.Axes(
+        x_range=[0, 21, 1],
+        y_range=[0.0, 1.0, 0.2],
+        axis_config={"color": mn.BLUE},
+        y_axis_config={
+            "include_numbers": True,
+            "include_tip": False,
+        },
+        x_axis_config={
+            "include_tip": False,
+            "include_ticks": False,
+        }
+    )
+
+    z = {float(i + 1): mn.Text(r, font="monospace")
+         for (i, r) in enumerate(protein_alphabet)}
+
+    axes.get_x_axis().add_labels(z)
+
+    return axes
+
+
+def residue_distribution():
+    data = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.5,
+            0.4, 0.3, 0.2, 0.1, 0.6, 0.7, 0.8, 0.9, 0.5, 0.4]
+
+    axes = residue_axes()
+
+    a = axes.get_y_axis().number_to_point(0.0)
+
+    bars = mn.VGroup()
+    for i, value in enumerate(data):
+        x = i + 1
+        b = axes.get_y_axis().number_to_point(value)
+        height = b[1] - a[1]
+        bar = mn.Rectangle(
+            width=0.4,
+            height=height,
+            fill_color=mn.GREEN,
+            fill_opacity=0.7,
+            stroke_color=mn.WHITE,
+            stroke_width=1,
+        ).move_to(axes.c2p(x, value / 2))
+        bars.add(bar)
+
+    g = mn.VGroup(axes, bars)
+
+    return g
+
+
+class Dist(mn.Scene):
     def construct(self):
-        pass
+        plot = residue_distribution()
+        self.play(mn.FadeIn(plot))
+
+
+SECTION = 0
+
+
+class Msa(mn.Scene):
+    section_count = 0
+
+    def section(self):
+        self.next_section(skip_animations=self.section_count < SECTION)
+        self.section_count += 1
+
+    def construct(self):
+        # SECTION 0
+        self.section()
+
+        seqs = protein_seqs()
+        ali_rows, ali_2d = protein_ali()
+
+        n_seqs = len(ali_2d)
+        cols = list(zip(*ali_2d))
+        counts = [(n_seqs - col.count("-")) for col in cols]
+
+        self.add(seqs)
+
+        # SECTION 1
+        self.section()
+
+        g = mn.AnimationGroup(
+            *[mn.TransformMatchingShapes(s, a)
+              for (s, a) in zip(seqs, ali_rows)],
+        )
+
+        self.play(g, run_time=0.25)
+        self.play(mn.ApplyMethod(ali_rows.arrange, mn.DOWN, 0.0))
+
+        # SECTION 2
+        self.section()
+
+        g = []
+        for seq in ali_rows:
+            for char in seq:
+                color = msa_colors[char[1].text]
+                g.append(mn.ApplyMethod(
+                    char[0].set_stroke, mn.WHITE, 1.0, 1.0)
+                )
+
+        self.play(mn.AnimationGroup(*g), run_time=0.1)
+
+        for seq in ali_rows:
+            for char in seq:
+                color = msa_colors[char[1].text]
+                g.append(mn.ApplyMethod(char[0].set_fill, color, 0.5))
+
+        self.play(mn.AnimationGroup(*g), run_time=0.1)
+
+        # SECTION 3
+        self.section()
+
+        cons_cols = [i for i, c in enumerate(counts) if c / n_seqs >= 0.5]
+        nons_cols = [i for i, c in enumerate(counts) if c / n_seqs <= 0.5]
+
+        ali_cols = list(zip(*ali_rows))
+
+        cons_cols = [ali_cols[i] for i in cons_cols]
+        nons_cols = [ali_cols[i] for i in nons_cols]
+
+        g = []
+        g2 = []
+        for col in nons_cols:
+            for (s, c) in col:
+                g.append(mn.ApplyMethod(s.set_fill, mn.BLACK, 0.0))
+                g.append(mn.ApplyMethod(c.set_opacity, 0.25))
+                g2.append(mn.FadeOut(s, c))
+
+        self.play(mn.AnimationGroup(*g), run_time=0.1)
+        self.play(mn.AnimationGroup(*g2), run_time=0.1)
+
+        # SECTION 4
+        self.section()
+
+        cons_cols = mn.VGroup(*[mn.VGroup(*col) for col in cons_cols])
+
+        self.play(mn.ApplyMethod(cons_cols.arrange,
+                  mn.RIGHT, 0.0), run_time=0.1)
+        self.play(mn.ApplyMethod(cons_cols.to_edge, mn.UP), run_time=0.1)
+
+        # SECTION 5
+        self.section()
+
+        axes = residue_axes().scale(0.5).shift(mn.DOWN * 2)
+        self.play(mn.FadeIn(axes), run_time=0.1)
+
+        # SECTION 6
+        self.section()
+
+        for col in cons_cols[:1]:
+            others = mn.VGroup(*[other for other in cons_cols if other != col])
+            self.play(
+                mn.AnimationGroup(
+                    mn.ApplyMethod(col.set_opacity, 1.0),
+                    mn.ApplyMethod(others.set_opacity, 0.1),
+                ),
+                run_time=0.1
+            )
+
+            mn.Square().move_to
+            last_at = [None for _ in range(21)]
+            for row in col:
+                residue = row[1].text
+
+                if residue == "-":
+                    continue
+
+                idx = protein_alphabet.index(residue) + 1
+
+                last = last_at[idx]
+
+                if last is not None:
+                    a = mn.ApplyMethod(row.next_to, last, mn.UP, 0.0)
+                else:
+                    point = axes.get_x_axis().number_to_point(idx)
+                    a = mn.ApplyMethod(row.move_to, point + mn.UP * 0.25)
+
+                self.play(
+                    a,
+                    run_time=0.1
+                )
+
+                last_at[idx] = row
