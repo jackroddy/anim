@@ -13,16 +13,16 @@ all: $(SCENES)
 
 # Individual targets for each scene
 Alignment: $(SCRIPT)
-	$(MANIM) -pq$(Q) $< $@
+	$(MANIM) -pq$(Q) --save_sections $< $@
 
 AlignmentDp: $(SCRIPT)
-	$(MANIM) -pq$(Q) $< $@
+	$(MANIM) -pq$(Q) --save_sections $< $@
 
 Msa: $(SCRIPT)
-	$(MANIM) -pq$(Q) $< $@
+	$(MANIM) -pq$(Q) --save_sections $< $@
 
 Dist: $(SCRIPT)
-	$(MANIM) -pq$(Q) $< $@
+	$(MANIM) -pq$(Q) --save_sections $< $@
 
 
 # Clean up generated files

@@ -466,13 +466,20 @@ protein_alphabet = ["A", "C", "D", "E", "F", "G", "H", "I",
                     "K", "L", "M", "N", "P", "Q", "R", "S", "T", "V", "W", "Y"]
 
 
-def residue_axes():
+X_LEN = 12
+Y_LEN = 6
+
+
+def residue_axes(ylim):
+    y_step = ylim / 5
     axes = mn.Axes(
+        x_length=X_LEN,
+        y_length=Y_LEN,
         x_range=[0, 21, 1],
-        y_range=[0.0, 1.0, 0.2],
+        y_range=[0.0, ylim, y_step],
         axis_config={"color": mn.BLUE},
         y_axis_config={
-            "include_numbers": True,
+            "include_numbers": False,
             "include_tip": False,
         },
         x_axis_config={
@@ -481,26 +488,64 @@ def residue_axes():
         }
     )
 
-    z = {float(i + 1): mn.Text(r, font="monospace")
-         for (i, r) in enumerate(protein_alphabet)}
+    s = mn.Rectangle(
+        height=Y_LEN + 0.5,
+        width=X_LEN + 1.1,
+        stroke_width=0.25,
+        stroke_opacity=0.0,
+    )
+    axes.move_to(s.get_center()).shift(mn.RIGHT * 0.55)
 
-    axes.get_x_axis().add_labels(z)
+    y_ticks = [i * y_step for i in range(1, 6)]
 
-    return axes
+    y_labels = {
+        y: mn.MathTex(f"{y:3.2f}")
+        for y in y_ticks
+    }
+
+    x_labels = {
+        float(i + 1): mn.Text(r, font="monospace")
+        for (i, r) in enumerate(protein_alphabet)
+    }
+
+    axes.get_x_axis().add_labels(x_labels)
+    axes.get_y_axis().add_labels(y_labels)
+
+    return mn.VGroup(axes, s)
 
 
-def residue_distribution():
-    data = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.5,
-            0.4, 0.3, 0.2, 0.1, 0.6, 0.7, 0.8, 0.9, 0.5, 0.4]
+def background_distribution(ylim=0.12):
+    freqs = [
+        0.0787945,  # A
+        0.0151600,  # C
+        0.0535222,  # D
+        0.0668298,  # E
+        0.0397062,  # F
+        0.0695071,  # G
+        0.0229198,  # H
+        0.0590092,  # I
+        0.0594422,  # K
+        0.0963728,  # L
+        0.0237718,  # M
+        0.0414386,  # N
+        0.0482904,  # P
+        0.0395639,  # Q
+        0.0540978,  # R
+        0.0683364,  # S
+        0.0540687,  # T
+        0.0673417,  # V
+        0.0114135,  # W
+        0.0304133,  # Y
+    ]
+    axes = residue_axes(ylim)
 
-    axes = residue_axes()
-
-    a = axes.get_y_axis().number_to_point(0.0)
+    y_axis = axes[0].get_y_axis()
+    a = y_axis.number_to_point(0.0)
 
     bars = mn.VGroup()
-    for i, value in enumerate(data):
+    for i, value in enumerate(freqs):
         x = i + 1
-        b = axes.get_y_axis().number_to_point(value)
+        b = y_axis.number_to_point(value)
         height = b[1] - a[1]
         bar = mn.Rectangle(
             width=0.4,
@@ -509,7 +554,57 @@ def residue_distribution():
             fill_opacity=0.7,
             stroke_color=mn.WHITE,
             stroke_width=1,
-        ).move_to(axes.c2p(x, value / 2))
+        ).move_to(axes[0].c2p(x, value / 2))
+        bars.add(bar)
+
+    g = mn.VGroup(axes, bars)
+
+    return g
+
+
+def background_count_distribution(ylim=0.12):
+    freqs = [
+        0.0787945,  # A
+        0.0151600,  # C
+        0.0535222,  # D
+        0.0668298,  # E
+        0.0397062,  # F
+        0.0695071,  # G
+        0.0229198,  # H
+        0.0590092,  # I
+        0.0594422,  # K
+        0.0963728,  # L
+        0.0237718,  # M
+        0.0414386,  # N
+        0.0482904,  # P
+        0.0395639,  # Q
+        0.0540978,  # R
+        0.0683364,  # S
+        0.0540687,  # T
+        0.0673417,  # V
+        0.0114135,  # W
+        0.0304133,  # Y
+    ]
+    axes = residue_axes(ylim)
+
+    y_axis = axes[0].get_y_axis()
+
+    a = y_axis.number_to_point(0.0)
+
+    bars = mn.VGroup()
+    for i, value in enumerate(freqs):
+        x = i + 1
+        b = y_axis.number_to_point(value)
+        height = b[1] - a[1]
+        color = msa_colors[protein_alphabet[i]]
+        bar = mn.Rectangle(
+            width=0.4,
+            height=height,
+            fill_color=color,
+            fill_opacity=0.7,
+            stroke_color=mn.WHITE,
+            stroke_width=1,
+        ).move_to(axes[0].c2p(x, value / 2))
         bars.add(bar)
 
     g = mn.VGroup(axes, bars)
@@ -519,24 +614,33 @@ def residue_distribution():
 
 class Dist(mn.Scene):
     def construct(self):
-        plot = residue_distribution()
+        plot = background_distribution()
         self.play(mn.FadeIn(plot))
 
 
-SECTION = 0
+SECTION_START = 7
+SECTION_END = 100
 
 
 class Msa(mn.Scene):
     section_count = 0
 
+    def s_play(self, *args, **kwargs):
+        self.section()
+        self.play(*args, **kwargs)
+
     def section(self):
-        self.next_section(skip_animations=self.section_count < SECTION)
+        if self.section_count < SECTION_START:
+            skip = True
+        elif self.section_count > SECTION_END:
+            skip = True
+        else:
+            skip = False
+
+        self.next_section(skip_animations=skip)
         self.section_count += 1
 
     def construct(self):
-        # SECTION 0
-        self.section()
-
         seqs = protein_seqs()
         ali_rows, ali_2d = protein_ali()
 
@@ -544,41 +648,32 @@ class Msa(mn.Scene):
         cols = list(zip(*ali_2d))
         counts = [(n_seqs - col.count("-")) for col in cols]
 
-        self.add(seqs)
+        # fade in sequences
+        self.s_play(mn.FadeIn(seqs))
 
-        # SECTION 1
-        self.section()
-
-        g = mn.AnimationGroup(
-            *[mn.TransformMatchingShapes(s, a)
-              for (s, a) in zip(seqs, ali_rows)],
+        # align the sequences
+        self.s_play(
+            *[
+                mn.TransformMatchingShapes(s, a)
+                for (s, a) in zip(seqs, ali_rows)
+            ],
+            run_time=0.25
         )
+        self.play(ali_rows.animate.arrange(mn.DOWN, buff=0.0))
+        # ---
 
-        self.play(g, run_time=0.25)
-        self.play(mn.ApplyMethod(ali_rows.arrange, mn.DOWN, 0.0))
+        squares = mn.VGroup(*[char[0] for row in ali_rows for char in row])
+        chars = mn.VGroup(*[char[1] for row in ali_rows for char in row])
 
-        # SECTION 2
-        self.section()
-
-        g = []
-        for seq in ali_rows:
-            for char in seq:
-                color = msa_colors[char[1].text]
-                g.append(mn.ApplyMethod(
-                    char[0].set_stroke, mn.WHITE, 1.0, 1.0)
-                )
-
-        self.play(mn.AnimationGroup(*g), run_time=0.1)
-
-        for seq in ali_rows:
-            for char in seq:
-                color = msa_colors[char[1].text]
-                g.append(mn.ApplyMethod(char[0].set_fill, color, 0.5))
-
-        self.play(mn.AnimationGroup(*g), run_time=0.1)
-
-        # SECTION 3
-        self.section()
+        # set ali squares to MSA color
+        self.s_play(
+            *[
+                square.animate.set_stroke(mn.WHITE, width=1.0, opacity=1.0)
+                .set_fill(msa_colors[chars[i].text], opacity=0.5)
+                for (i, square) in enumerate(squares)
+            ],
+            run_time=0.1
+        )
 
         cons_cols = [i for i, c in enumerate(counts) if c / n_seqs >= 0.5]
         nons_cols = [i for i, c in enumerate(counts) if c / n_seqs <= 0.5]
@@ -596,28 +691,38 @@ class Msa(mn.Scene):
                 g.append(mn.ApplyMethod(c.set_opacity, 0.25))
                 g2.append(mn.FadeOut(s, c))
 
-        self.play(mn.AnimationGroup(*g), run_time=0.1)
-        self.play(mn.AnimationGroup(*g2), run_time=0.1)
+        # uncolor nonsensus cols
+        self.s_play(mn.AnimationGroup(*g), run_time=0.1)
 
-        # SECTION 4
-        self.section()
+        # fadeout nonsensus cols
+        self.s_play(mn.AnimationGroup(*g2), run_time=0.1)
 
         cons_cols = mn.VGroup(*[mn.VGroup(*col) for col in cons_cols])
 
-        self.play(mn.ApplyMethod(cons_cols.arrange,
-                  mn.RIGHT, 0.0), run_time=0.1)
-        self.play(mn.ApplyMethod(cons_cols.to_edge, mn.UP), run_time=0.1)
+        # rearrange consensus cols
+        self.s_play(
+            mn.ApplyMethod(
+                cons_cols.arrange,
+                mn.RIGHT, 0.0),
+            run_time=0.1
+        )
 
-        # SECTION 5
-        self.section()
+        # slide up consensus cols
+        self.s_play(mn.ApplyMethod(cons_cols.to_edge, mn.UP), run_time=0.1)
 
-        axes = residue_axes().scale(0.5).shift(mn.DOWN * 2)
-        self.play(mn.FadeIn(axes), run_time=0.1)
+        counts_plot = residue_axes(10)\
+            .scale(0.5)\
+            .shift(mn.DOWN * 2)
 
-        # SECTION 6
-        self.section()
+        # add in the distribution plot
+        self.s_play(mn.FadeIn(counts_plot), run_time=0.1)
 
-        for col in cons_cols[:1]:
+        def lol(col, plot):
+            x_axis = plot[0].get_x_axis()
+            y_axis = plot[0].get_y_axis()
+            [_, size, _] = y_axis.number_to_point(1) -\
+                y_axis.number_to_point(0)
+
             others = mn.VGroup(*[other for other in cons_cols if other != col])
             self.play(
                 mn.AnimationGroup(
@@ -627,27 +732,102 @@ class Msa(mn.Scene):
                 run_time=0.1
             )
 
-            mn.Square().move_to
-            last_at = [None for _ in range(21)]
-            for row in col:
-                residue = row[1].text
+            moves = []
+            counts = [0 for _ in range(21)]
+            for char in col:
+                residue = char[1].text
 
                 if residue == "-":
+                    moves.append(mn.FadeOut(char))
                     continue
 
                 idx = protein_alphabet.index(residue) + 1
 
-                last = last_at[idx]
+                x = x_axis.number_to_point(idx)[0]
+                y = y_axis.number_to_point(counts[idx])[1]
 
-                if last is not None:
-                    a = mn.ApplyMethod(row.next_to, last, mn.UP, 0.0)
-                else:
-                    point = axes.get_x_axis().number_to_point(idx)
-                    a = mn.ApplyMethod(row.move_to, point + mn.UP * 0.25)
-
-                self.play(
-                    a,
-                    run_time=0.1
+                moves.append(
+                    char.animate.scale_to_fit_height(size)
+                    .move_to([x, y, 0] + mn.UP * 0.15)
                 )
 
-                last_at[idx] = row
+                # MAKE BARS ON THE AXES 0 TALL
+                # grow them as we add a letter
+
+                # moves.append(
+                #     mn.Transform(char, )
+                # )
+
+                counts[idx] += 1
+
+            # move the residues onto the counts plot
+            self.s_play(
+                mn.Succession(
+                    *moves
+                ),
+                run_time=1.0)
+
+            zero_points = [
+                x_axis.number_to_point(i) for (i, cnt)
+                in enumerate(counts)
+                if cnt == 0
+            ]
+
+            arrows = mn.VGroup(
+                *[
+                    mn.Arrow(
+                        start=p + mn.UP * 0.5,
+                        end=p,
+                        buff=0.1,
+                        tip_length=0.5,
+                    ).set_color(mn.RED)
+                    for p in zero_points[1:]
+                ]
+            )
+
+            self.s_play(mn.FadeIn(arrows))
+            self.s_play(mn.FadeOut(arrows))
+
+            remaining = mn.VGroup(*[c for c in col if c[1].text != "-"])
+
+            return mn.VGroup(remaining, plot)
+
+        plot = lol(cons_cols[0], counts_plot)
+
+        background_probs = background_distribution()\
+            .scale(0.5)\
+            .shift(mn.DOWN * 2)\
+            .to_edge(mn.LEFT)
+
+        self.s_play(
+            plot.animate.to_edge(mn.RIGHT),
+            mn.FadeIn(background_probs)
+        )
+
+        background_counts_a = background_count_distribution(ylim=1)\
+            .scale(0.5)\
+            .shift(mn.DOWN * 2)\
+            .to_edge(mn.LEFT)
+
+        self.s_play(
+            mn.Transform(
+                background_probs,
+                background_counts_a,
+                replace_mobject_with_target_in_scene=True,
+            )
+        )
+
+        background_counts_b = background_count_distribution(ylim=10)\
+            .scale(0.5)\
+            .shift(mn.DOWN * 2)\
+            .to_edge(mn.LEFT)
+
+        self.s_play(
+            mn.Transform(
+                background_counts_a,
+                background_counts_b,
+                replace_mobject_with_target_in_scene=True,
+            )
+        )
+
+        self.wait(2)
